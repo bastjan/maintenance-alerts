@@ -1,0 +1,20 @@
+groups:
+- name: maintenance
+  rules:
+  - alert: MaintenanceAlertFiring
+    expr: |
+      count ((
+          # Prioritize alerts with silence information
+              (max by(tenant_id,cluster_id) (up{namespace="appuio-alerts-exporter",job="alerts-exporter-metrics-service"}) == 1)
+          and on(tenant_id,cluster_id)
+              alerts_exporter_alerts{Maintenance="true",alertname!="MaintenanceInProgress",_alerts_exporter_alert_state="active"}
+          and on(tenant_id,cluster_id)
+              ALERTS{Maintenance="true",alertname="MaintenanceInProgress",alertstate="firing",source!="mimir"}
+      ) or on() (
+          # ... but fall back to prometheus alerts if exporter is down
+              (max by(tenant_id,cluster_id) (up{namespace="appuio-alerts-exporter",job="alerts-exporter-metrics-service"}) == 0)
+          and on(tenant_id,cluster_id)
+              ALERTS{Maintenance="true",alertname!="MaintenanceInProgress",alertstate="firing",source!="mimir"}
+          and on(tenant_id,cluster_id)
+              ALERTS{Maintenance="true",alertname="MaintenanceInProgress",alertstate="firing",source!="mimir"}
+      )) > 0

@@ -1,0 +1,43 @@
+# This is the main input for unit testing.
+# Only this file is passed as command line argument.
+
+rule_files:
+  - alerts.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{tenant_id="t",cluster_id="c",namespace="appuio-alerts-exporter",job="alerts-exporter-metrics-service"}'
+        values: "1 0"
+      - series: 'ALERTS{tenant_id="t",cluster_id="c",Maintenance="true",alertname="MaintenanceInProgress",alertstate="firing",test_label="blub"}'
+        values: "1 1"
+      - series: 'alerts_exporter_alerts{tenant_id="t",cluster_id="c",Maintenance="true",alertname="DudeIDidNothingISwear",_alerts_exporter_alert_state="active",_it_broke="true"}'
+        values: "1 1"
+    alert_rule_test:
+      # alerts_exporter up, taking alerts from alerts_exporter_alerts series
+      - eval_time: 0m
+        alertname: MaintenanceAlertFiring
+        exp_alerts: [{}]
+      # alerts_exporter down, taking alerts from non-existing ALERTS
+      - eval_time: 1m
+        alertname: MaintenanceAlertFiring
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'up{tenant_id="t",cluster_id="c",namespace="appuio-alerts-exporter",job="alerts-exporter-metrics-service"}'
+        values: "0 1"
+      - series: 'ALERTS{tenant_id="t",cluster_id="c",Maintenance="true",alertname="MaintenanceInProgress",alertstate="firing",test_label="blub"}'
+        values: "1 1"
+      - series: 'ALERTS{tenant_id="t",cluster_id="c",Maintenance="true",alertname="DudeIDidNothingISwear",alertstate="firing",test_label="another-one"}'
+        values: "1 1"
+    alert_rule_test:
+      # alerts_exporter down, taking alerts from ALERTS series
+      - eval_time: 0m
+        alertname: MaintenanceAlertFiring
+        exp_alerts: [{}]
+      # alerts_exporter up, taking alerts from non-existing alerts_exporter_alerts
+      - eval_time: 1m
+        alertname: MaintenanceAlertFiring
+        exp_alerts: []
